@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://download.affectiva.com/js/3.2/affdex.js"></script> 
+    <script src="http://code.jquery.com/jquery-latest.min.js" type="text/javascript"></script>
+    <script type="text/javascript" src="https://cdn.rawgit.com/eligrey/FileSaver.js/5ed507ef8aa53d8ecfea96d96bc7214cd2476fd2/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet"> 
+    <style>
+      body {
+        font-family: 'Open Sans', sans-serif;
+      }
+      .container {
+        padding: 15px;
+      }
+    </style>
+    <script>
+      //Construct a PhotoDetector
+      var detector = new affdex.PhotoDetector();
+      var imgNames = [];
+      var imgEmotions = [];
+      var result = [];
+      var indx = 0;
+      //Enable detection of all Expressions, Emotions and Emojis classifiers.
+      detector.detectAllEmotions();
+      detector.detectAllExpressions();
+      detector.detectAllEmojis();
+      detector.detectAllAppearance();
+
+      //Add a callback to notify when the detector is initialized and ready for runing.
+      detector.addEventListener("onInitializeSuccess", function() {
+        log('#logs', "The detector reports initialized");
+
+        $("#upload_button").css("visibility", "visible");
+      });
+
+      detector.addEventListener("onImageResultsSuccess", function(faces, image, timestamp) {
+        if(faces.length>0) {
+          imgEmotions.push(faces[0].emotions);
+        }
+        else {
+          imgEmotions.push({});
+        }
+        if (faces.length > 0) {
+          log('#results', "Emotions: " + JSON.stringify(faces[0].emotions, function(key, val) {
+            return val.toFixed ? Number(val.toFixed(0)) : val;
+          }));
+        }
+        else {
+          log('#results', "Face not found");
+        }
+        if(imgEmotions.length == imgNames.length) {
+          imgNames.forEach(function (element, index, array) {
+            var obj = {};
+            obj.imagename = element;
+            obj.emotions = imgEmotions[index];
+            result.push(obj);
+          });
+          console.log(result);
+          var json = JSON.stringify(result);
+          var blob = new Blob([json], {type: "application/json"});
+          var saveAs = window.saveAs;
+          saveAs(blob, "wyniki.json");
+        }
+      });
+
+      //Add a callback to notify if failed receive the results from processing an image.
+      detector.addEventListener("onImageResultsFailure", function(image, timestamp, error) {
+        log('#logs', 'Failed to process image err=' + error);
+      });
+
+      //Initialize the emotion detector
+      log("#logs", "Starting the detector .. please wait");
+      detector.start();
+
+
+      //Once the image is loaded, pass it down for processing
+      function imageLoaded(event) {
+
+        var contxt = document.createElement('canvas').getContext('2d');
+        contxt.canvas.width = this.width;
+        contxt.canvas.height = this.height;
+        contxt.drawImage(this, 0, 0, this.width, this.height);
+
+        // Pass the image to the detector to track emotions
+        if (detector && detector.isRunning) {
+          detector.process(contxt.getImageData(0, 0, this.width, this.height), 0);
+        }
+      }
+
+      //Load the selected image
+      function loadFile(event) {
+        $('#results').html("");
+        imgNames = [];
+        imgEmotions = [];
+        result = [];
+        photos = event.target.files;
+        Array.from(photos).forEach(file => {
+          imgNames.push(file.name);
+          photoName = file.name; 
+          var img = new Image();
+          var reader = new FileReader();
+          reader.onload = function() {
+            img.onload = imageLoaded;
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      };
+
+      //Convienence function for logging to the DOM
+      function log(node_name, msg) {
+        $(node_name).append("<span>" + msg + "</span><br />")
+      }
+ 
+    </script>
+  </head>
+
+  <body>
+    <div>
+      <div>
+        <div>
+          <div class="container">
+            <strong>Result</strong>
+            <div id="results" style="word-wrap:break-word;"></div>
+          </div>
+          <div class="container">
+            <strong>Detector message</strong>
+            <div id="logs"></div>
+          </div>
+        </div>
+      </div>
+      <div class="container">
+        <input id="upload_button" type="file" accept="image/*" onchange="loadFile(event)" style="visibility: hidden;" multiple>
+      </div>
+    </div>
+    <div>
+      <canvas id="image_canvas">
+    </div>
+  </body>
+  
+</html>
